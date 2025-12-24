@@ -1,3 +1,7 @@
+// backend/src/server.js
+const staticPath = path.join(__dirname, '../../frontend/build');
+app.use(express.static(staticPath)); // ← Must point to build/
+
 // src/server.js
 import express from 'express';
 import cors from 'cors';

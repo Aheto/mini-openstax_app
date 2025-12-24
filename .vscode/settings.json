@@ -1,0 +1,49 @@
+{
+  // 🔧 General Workspace Settings
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.gradle": true,
+    "**/node_modules": true,
+    "**/bower_components": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/.git": true
+  },
+
+  // 🎨 Formatting & Linting
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+
+  // 📦 JavaScript/TypeScript
+  "typescript.preferences.includePackageJsonAutoImports": "auto",
+  "javascript.preferences.includePackageJsonAutoImports": "auto",
+  "typescript.updateImportsOnFileMove.enabled": "always",
+
+  // 🌐 ESLint + Prettier Integration
+  "eslint.enable": true,
+  "eslint.run": "onSave",
+  "eslint.options": {
+    "extensions": [".ts", ".tsx", ".js", ".jsx"]
+  },
+  "prettier.requireConfig": false,
+  "prettier.useEditorConfig": false,
+
+  // 📁 Path Mapping (if you add tsconfig paths later)
+  "typescript.preferences.autoImportFileExcludePatterns": [
+    "**/node_modules/**",
+    "**/dist/**"
+  ],
+
+  // 🔒 Security
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+
+  // 🧪 Recommended Extensions (for status bar prompt)
+  "extensions.ignoreRecommendations": false
+}
