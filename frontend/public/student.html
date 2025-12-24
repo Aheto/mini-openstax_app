@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mini OpenStax - Student View</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --success: #10b981;
+      --danger: #ef4444;
+      --bg: #f8fafc;
+      --card-bg: white;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background-color: var(--bg);
+      color: #1e293b;
+      line-height: 1.6;
+      padding: 1.5rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .role-badge {
+      background: #dbeafe;
+      color: #1d4ed8;
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+
+    .lo-tags {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+    }
+
+    .lo-tag {
+      background: #dbeafe;
+      color: #1d4ed8;
+      padding: 0.25rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+    }
+
+    .chapter-content {
+      margin-bottom: 2.5rem;
+    }
+
+    .chapter-content p {
+      margin-bottom: 1rem;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .quiz-item {
+      margin-bottom: 1.5rem;
+    }
+
+    .quiz-item p {
+      margin-bottom: 0.75rem;
+      font-weight: 600;
+    }
+
+    .quiz-option {
+      display: block;
+      margin: 0.5rem 0;
+    }
+
+    .quiz-option input {
+      margin-right: 0.5rem;
+    }
+
+    .quiz-feedback {
+      padding: 0.5rem;
+      border-radius: 6px;
+      margin-top: 0.5rem;
+    }
+
+    .feedback-correct {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .feedback-incorrect {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 0.5rem 1.25rem;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .btn:disabled {
+      background: #94a8da;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: #64748b;
+    }
+
+    .error {
+      color: var(--danger);
+      margin: 1rem 0;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 2rem;
+    }
+
+    .score-card {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #f1f5f9;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1 id="chapter-title">Loading...</h1>
+      <div class="lo-tags" id="lo-tags"></div>
+    </div>
+    <div class="role-badge">Student View</div>
+  </header>
+
+  <main id="main-content">
+    <div class="loading">Loading chapter...</div>
+  </main>
+
+  <script>
+    // --- Configuration ---
+    const API_BASE_URL = ''; // Same origin (no need for full URL)
+    const CHAPTER_ID = 1; // Hardcoded for MVP
+
+    // --- DOM Elements ---
+    const mainContent = document.getElementById('main-content');
+    const chapterTitle = document.getElementById('chapter-title');
+    const loTagsContainer = document.getElementById('lo-tags');
+
+    // --- State ---
+    let selectedAnswers = {};
+    let isSubmitted = false;
+    let feedback = {};
+    let score = null;
+
+    // --- Fetch Chapter ---
+    async function fetchChapter() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/chapters/${CHAPTER_ID}`);
+        if (!res.ok) throw new Error('Chapter not found');
+        const chapter = await res.json();
+        renderChapter(chapter);
+      } catch (err) {
+        mainContent.innerHTML = `<div class="error">Error: ${err.message}</div>`;
+      }
+    }
+
+    // --- Render Chapter ---
+    function renderChapter(chapter) {
+      chapterTitle.textContent = chapter.title;
+
+      // LO Tags
+      loTagsContainer.innerHTML = '';
+      chapter.learning_objectives.forEach(lo => {
+        const tag = document.createElement('span');
+        tag.className = 'lo-tag';
+        tag.textContent = lo.tag;
+        loTagsContainer.appendChild(tag);
+      });
+
+      // Chapter Content
+      const contentDiv = document.createElement('div');
+      contentDiv.className = 'chapter-content';
+      contentDiv.innerHTML = chapter.content_html;
+
+      // Quiz Section
+      let quizHTML = '';
+      if (chapter.assessment_items.length > 0) {
+        quizHTML = `
+          <section class="card">
+            <h2>Check Your Understanding</h2>
+            ${chapter.assessment_items.map(item => `
+              <div class="quiz-item" data-item-id="${item.id}">
+                <p>${item.prompt}</p>
+                ${item.options.map(opt => `
+                  <label class="quiz-option">
+                    <input type="radio" name="q-${item.id}" value="${opt.id}" ${isSubmitted ? 'disabled' : ''}>
+                    ${opt.text}
+                  </label>
+                `).join('')}
+                ${feedback[item.id] ? `
+                  <div class="quiz-feedback ${feedback[item.id].is_correct ? 'feedback-correct' : 'feedback-incorrect'}">
+                    ${feedback[item.id].is_correct ? '✅ Correct!' : `❌ Incorrect. The correct answer is: ${item.options.find(o => o.is_correct)?.text || '—'}`}
+                  </div>
+                ` : ''}
+              </div>
+            `).join('')}
+            ${!isSubmitted ? `
+              <button class="btn" id="submit-btn" disabled>Submit Quiz</button>
+            ` : `
+              <div class="score-card">
+                <p><strong>Your Score:</strong> ${Math.round((score || 0) * 100)}%</p>
+                <button class="btn btn-secondary" disabled>Quiz Submitted</button>
+              </div>
+            `}
+          </section>
+        `;
+      }
+
+      mainContent.innerHTML = '';
+      mainContent.appendChild(contentDiv);
+      if (quizHTML) {
+        mainContent.innerHTML += quizHTML;
+        setupEventListeners(chapter.assessment_items);
+      }
+    }
+
+    // --- Event Listeners ---
+    function setupEventListeners(items) {
+      if (isSubmitted) return;
+
+      // Radio button changes
+      items.forEach(item => {
+        const inputs = document.querySelectorAll(`input[name="q-${item.id}"]`);
+        inputs.forEach(input => {
+          input.addEventListener('change', (e) => {
+            selectedAnswers[item.id] = e.target.value;
+            updateSubmitButton(items);
+          });
+        });
+      });
+
+      // Submit button
+      const submitBtn = document.getElementById('submit-btn');
+      if (submitBtn) {
+        submitBtn.addEventListener('click', handleSubmit);
+      }
+    }
+
+    function updateSubmitButton(items) {
+      const submitBtn = document.getElementById('submit-btn');
+      if (submitBtn) {
+        const answered = Object.keys(selectedAnswers).length;
+        submitBtn.disabled = answered === 0;
+      }
+    }
+
+    // --- Submit Quiz ---
+    async function handleSubmit() {
+      const answers = Object.entries(selectedAnswers).map(([item_id, option_id]) => ({
+        item_id,
+        option_id
+      }));
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/submissions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chapter_id: CHAPTER_ID, answers })
+        });
+
+        if (!res.ok) throw new Error('Submission failed');
+        const result = await res.json();
+
+        // Process feedback
+        feedback = {};
+        let correctCount = 0;
+        result.item_results.forEach(r => {
+          feedback[r.item_id] = r;
+          if (r.is_correct) correctCount++;
+        });
+        score = result.score;
+
+        isSubmitted = true;
+        fetchChapter(); // Re-render with feedback
+      } catch (err) {
+        alert(`Error: ${err.message}`);
+      }
+    }
+
+    // --- Initialize ---
+    fetchChapter();
+  </script>
+</body>
+</html>
