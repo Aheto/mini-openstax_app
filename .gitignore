@@ -1,5 +1,0 @@
-# .gitignore
-node_modules/
-.env.local
-build/
-.DS_Store
