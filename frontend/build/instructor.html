@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Mini OpenStax: Instructor analytics dashboard" />
+  <title>Mini OpenStax — Instructor</title>
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1 id="assignment-title">Loading Dashboard...</h1>
+        <p id="student-count">— students enrolled</p>
+      </div>
+      <div class="role-badge">Instructor View</div>
+    </div>
+
+    <main id="main-content">
+      <div class="loading">Loading analytics...</div>
+    </main>
+  </div>
+
+  <script>
+    (function() {
+      // ======================
+      // CONFIGURATION
+      // ======================
+      const API_BASE_URL = ''; // Same origin
+      const ASSIGNMENT_ID = window.location.pathname.split('/').pop() || '1';
+
+      // DOM Elements
+      const mainContent = document.getElementById('main-content');
+      const assignmentTitle = document.getElementById('assignment-title');
+      const studentCount = document.getElementById('student-count');
+
+      // ======================
+      // UTILITY FUNCTIONS
+      // ======================
+
+      /**
+       * Sanitize HTML to prevent XSS
+       */
+      function sanitizeHTML(str) {
+        if (typeof str !== 'string') return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      /**
+       * Show error message
+       */
+      function showError(message) {
+        mainContent.innerHTML = `<div class="error">${sanitizeHTML(message)}</div>`;
+      }
+
+      // ======================
+      // FETCH ANALYTICS
+      // ======================
+
+      async function fetchAnalytics() {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/instructor/assignments/${ASSIGNMENT_ID}/analytics`);
+          if (!res.ok) throw new Error('Analytics data not available');
+          const data = await res.json();
+          renderDashboard(data);
+        } catch (err) {
+          showError(err.message || 'Failed to load analytics');
+        }
+      }
+
+      // ======================
+      // RENDER DASHBOARD
+      // ======================
+
+      function renderDashboard(data) {
+        // Header
+        assignmentTitle.textContent = sanitizeHTML(data.assignment_title);
+        studentCount.textContent = `${data.total_students} students enrolled`;
+
+        // Metrics Grid
+        const metricsHTML = `
+          <div class="analytics-grid">
+            <div class="metric-card">
+              <div class="metric-value">${Math.round(data.completion_rate * 100)}%</div>
+              <div class="metric-label">Completion Rate</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-value">${Math.round(data.avg_score * 100)}%</div>
+              <div class="metric-label">Average Score</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-value">${data.students_needing_review}</div>
+              <div class="metric-label">Needs Review</div>
+            </div>
+          </div>
+        `;
+
+        // LO Mastery Section
+        let loMasteryHTML = '';
+        if (data.lo_mastery && data.lo_mastery.length > 0) {
+          loMasteryHTML = `
+            <section>
+              <h2>Learning Objective Mastery</h2>
+              ${data.lo_mastery.map(lo => {
+                const isMastered = lo.mastery >= 0.8;
+                return `
+                  <div class="card lo-mastery-item">
+                    <div class="lo-mastery-header">
+                      <strong class="lo-tag">${sanitizeHTML(lo.tag)}</strong>
+                      <span>${isMastered ? '✅ Mastered' : Math.round(lo.mastery * 100) + '% mastered'}</span>
+                    </div>
+                    <div class="progress-bar">
+                      <div 
+                        class="progress-fill ${isMastered ? 'mastered' : 'needs-review'}" 
+                        style="width: ${Math.min(100, lo.mastery * 100)}%">
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </section>
+          `;
+        } else {
+          loMasteryHTML = '<p>No learning objectives tracked for this assignment.</p>';
+        }
+
+        // Render
+        mainContent.innerHTML = metricsHTML + loMasteryHTML;
+      }
+
+      // ======================
+      // INITIALIZE
+      // ======================
+
+      // Handle browser back button
+      window.addEventListener('popstate', fetchAnalytics);
+
+      // Load analytics on page load
+      document.addEventListener('DOMContentLoaded', fetchAnalytics);
+    })();
+  </script>
+</body>
+</html>
