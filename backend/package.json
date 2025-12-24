@@ -1,7 +1,7 @@
 {
   "name": "mini-openstax-backend",
   "version": "1.0.0",
-  "description": "Backend for Mini OpenStax MVP: Node.js + Express + PostgreSQL",
+  "description": "Backend for Mini OpenStax MVP: Vanilla HTML/CSS/JS frontend + Express + PostgreSQL",
   "main": "src/server.js",
   "type": "module",
   "scripts": {
