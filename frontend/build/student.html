@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Mini OpenStax: Student chapter view with auto-graded quiz" />
+  <title>Mini OpenStax — Student</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    /* Override for student-specific styles */
+    .chapter-content {
+      margin: 1.5rem 0 2.5rem;
+      line-height: 1.8;
+    }
+    .chapter-content p {
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1 id="chapter-title">Loading Chapter...</h1>
+        <div class="lo-tags" id="lo-tags"></div>
+      </div>
+      <div class="role-badge">Student View</div>
+    </div>
+
+    <main id="main-content">
+      <div class="loading">Loading chapter content...</div>
+    </main>
+  </div>
+
+  <script>
+    (function() {
+      // ======================
+      // CONFIGURATION
+      // ======================
+      const API_BASE_URL = ''; // Same origin
+      const CHAPTER_ID = window.location.pathname.split('/').pop() || '1';
+
+      // DOM Elements
+      const mainContent = document.getElementById('main-content');
+      const chapterTitle = document.getElementById('chapter-title');
+      const loTagsContainer = document.getElementById('lo-tags');
+
+      // State
+      let selectedAnswers = {};
+      let isSubmitted = false;
+      let feedback = {};
+      let score = null;
+
+      // ======================
+      // UTILITY FUNCTIONS
+      // ======================
+
+      /**
+       * Sanitize HTML to prevent XSS
+       */
+      function sanitizeHTML(str) {
+        if (typeof str !== 'string') return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      /**
+       * Show error message
+       */
+      function showError(message) {
+        mainContent.innerHTML = `<div class="error">${sanitizeHTML(message)}</div>`;
+      }
+
+      // ======================
+      // FETCH CHAPTER
+      // ======================
+
+      async function fetchChapter() {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/chapters/${CHAPTER_ID}`);
+          if (!res.ok) throw new Error('Chapter not found');
+          const chapter = await res.json();
+          renderChapter(chapter);
+        } catch (err) {
+          showError(err.message || 'Failed to load chapter');
+        }
+      }
+
+      // ======================
+      // RENDER CHAPTER
+      // ======================
+
+      function renderChapter(chapter) {
+        // Title
+        chapterTitle.textContent = sanitizeHTML(chapter.title);
+
+        // LO Tags
+        loTagsContainer.innerHTML = '';
+        chapter.learning_objectives.forEach(lo => {
+          const tag = document.createElement('span');
+          tag.className = 'lo-tag';
+          tag.textContent = sanitizeHTML(lo.tag);
+          loTagsContainer.appendChild(tag);
+        });
+
+        // Chapter Content
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'chapter-content';
+        contentDiv.innerHTML = chapter.content_html || '<p>No content available.</p>';
+
+        // Quiz Section
+        let quizHTML = '';
+        if (chapter.assessment_items && chapter.assessment_items.length > 0) {
+          quizHTML = `
+            <section class="card quiz-section">
+              <h2>Check Your Understanding</h2>
+              ${chapter.assessment_items.map(item => `
+                <div class="quiz-item" data-item-id="${item.id}">
+                  <p>${sanitizeHTML(item.prompt)}</p>
+                  ${item.options.map(opt => `
+                    <label class="quiz-option">
+                      <input type="radio" name="q-${item.id}" value="${opt.id}" ${isSubmitted ? 'disabled' : ''}>
+                      ${sanitizeHTML(opt.text)}
+                    </label>
+                  `).join('')}
+                  ${feedback[item.id] ? `
+                    <div class="quiz-feedback ${feedback[item.id].is_correct ? 'feedback-correct' : 'feedback-incorrect'}">
+                      ${feedback[item.id].is_correct ? 
+                        '✅ Correct!' : 
+                        `❌ Incorrect. The correct answer is: ${item.options.find(o => o.is_correct)?.text || '—'}`
+                      }
+                    </div>
+                  ` : ''}
+                </div>
+              `).join('')}
+              ${!isSubmitted ? `
+                <button class="btn" id="submit-quiz-btn" disabled>Submit Quiz</button>
+              ` : `
+                <div class="score-card">
+                  <p><strong>Your Score:</strong> ${Math.round((score || 0) * 100)}%</p>
+                  <button class="btn btn-secondary" disabled>Quiz Submitted</button>
+                </div>
+              `}
+            </section>
+          `;
+        }
+
+        // Render
+        mainContent.innerHTML = '';
+        mainContent.appendChild(contentDiv);
+        if (quizHTML) {
+          mainContent.innerHTML += quizHTML;
+          setupEventListeners(chapter.assessment_items);
+        }
+      }
+
+      // ======================
+      // EVENT LISTENERS
+      // ======================
+
+      function setupEventListeners(items) {
+        if (isSubmitted) return;
+
+        // Radio button changes
+        items.forEach(item => {
+          const inputs = document.querySelectorAll(`input[name="q-${item.id}"]`);
+          inputs.forEach(input => {
+            input.addEventListener('change', (e) => {
+              selectedAnswers[item.id] = e.target.value;
+              updateSubmitButton(items);
+            });
+          });
+        });
+
+        // Submit button
+        const submitBtn = document.getElementById('submit-quiz-btn');
+        if (submitBtn) {
+          submitBtn.addEventListener('click', handleSubmit);
+        }
+      }
+
+      function updateSubmitButton(items) {
+        const submitBtn = document.getElementById('submit-quiz-btn');
+        if (submitBtn) {
+          const answered = Object.keys(selectedAnswers).length;
+          submitBtn.disabled = answered === 0 || answered !== items.length;
+        }
+      }
+
+      // ======================
+      // SUBMIT QUIZ
+      // ======================
+
+      async function handleSubmit() {
+        const answers = Object.entries(selectedAnswers).map(([item_id, option_id]) => ({
+          item_id: item_id,
+          option_id: option_id
+        }));
+
+        try {
+          mainContent.innerHTML = '<div class="loading">Submitting quiz...</div>';
+          
+          const res = await fetch(`${API_BASE_URL}/api/submissions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chapter_id: CHAPTER_ID, answers })
+          });
+
+          if (!res.ok) {
+            const errorText = await res.text();
+            throw new Error(errorText || 'Submission failed');
+          }
+
+          const result = await res.json();
+
+          // Process feedback
+          feedback = {};
+          result.item_results.forEach(r => {
+            feedback[r.item_id] = r;
+          });
+          score = result.score;
+          isSubmitted = true;
+
+          // Re-fetch chapter to render with feedback
+          fetchChapter();
+        } catch (err) {
+          showError(err.message || 'An error occurred during submission');
+        }
+      }
+
+      // ======================
+      // INITIALIZE
+      // ======================
+
+      // Handle browser back button (re-fetch if needed)
+      window.addEventListener('popstate', fetchChapter);
+
+      // Load chapter on page load
+      document.addEventListener('DOMContentLoaded', fetchChapter);
+    })();
+  </script>
+</body>
+</html>
